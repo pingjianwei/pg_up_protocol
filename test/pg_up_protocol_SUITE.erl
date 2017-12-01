@@ -33,6 +33,7 @@ setup() ->
 
   application:start(up_config),
   application:start(pg_up_protocol),
+  application:start(xm_up_config),
   pg_test_utils:setup(mnesia),
 
   env_init(),
@@ -141,6 +142,8 @@ my_test_() ->
         , {timeout, 120, fun send_up_batch_collect_test_1/0}
 
         , {timeout, 120, fun info_collect_test_1/0}
+
+        , {timeout, 120, fun xm_sign_test_1/0}
 
       ]
     }
@@ -555,4 +558,15 @@ info_collect_test_1() ->
   ),
 
   ok.
+%%------------------------------------------------------------------------
+xm_sign_test_1()->
+  M = pg_xm_up_protocol,
+  BankcardRepo={pg_xm_up_protocol_req_bankcard, unfined, <<"B8999001">>,<<"201712011212">>, <<"2017-12-01 10:36:12">>,
+    <<"0030">>,<<"6225220113392773">>, <<>>, <<"220625198910180328">>, <<"赵金玲"/utf8>>,<<>>},
+  {SignString, Sig}=M:sign(pg_xm_up_protocol_req_bankcard,BankcardRepo),
+  ?assertEqual(<<"ORDERID=201712011212&TXNTIME=2017-12-01 10:36:12&VERIFYTYPE=0030&ACCNO=6225220113392773&ACCNAME=赵金玲&CERTNO=220625198910180328"/utf8>>,
+    SignString),
 
+  lager:debug("Sig:~p",[Sig]),
+  ?assertEqual(<<"aBhSmBdjZ5POBHmWyPKF8Hi1h2ljqeiQ0YbocXBYQ52Bu4ZvKrROU6xVu6R8ez9EIuPgeS8VOlT3otnnYRAmR2YJa5H048cuPhg+dlI7hJNXYAuYJG7VZW/3+4QQhEt01cx6AjcLUb0ChEVYuXh0Aye0lkG/8HNYlmbeK2H81FM=">>
+    ,Sig).
