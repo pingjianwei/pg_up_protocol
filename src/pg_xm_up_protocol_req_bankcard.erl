@@ -40,14 +40,14 @@
 
 -record(?P, {
   signature = <<"0">> :: pg_up_protocol:signature()
-  , merId = <<"012345678901234">> :: pg_up_protocol:merId()
-  , orderId = <<"0">> :: pg_up_protocol:orderId()
-  , txnTime = <<"19991212090909">> :: pg_up_protocol:txnTime()
-  , verifyType= <<"0040">>
-  , accNo = <<>> :: binary()
+  , customer_code = <<"012345678901234">> :: pg_up_protocol:merId()
+  , out_trade_no = <<"0">> :: pg_up_protocol:orderId()
+  , tran_time = <<"19991212090909">> :: pg_up_protocol:txnTime()
+  , verify_type = <<"0040">>
+  , acct_no = <<>> :: binary()
   , mcht_index_key = <<>> :: pg_up_protocol:mcht_index_key()
-  , certNo = <<>> :: pg_mcht_protocol:id_no()
-  , accName = <<>> :: pg_mcht_protocol:id_name()
+  , cert_no = <<>> :: pg_mcht_protocol:id_no()
+  , name = <<>> :: pg_mcht_protocol:id_name()
   , phone = <<>> :: pg_mcht_protocol:mobile()
 }).
 
@@ -58,19 +58,19 @@
 %%---------------------------------------------------------------------------------
 sign_fields() ->
   [
-    orderId
-    , txnTime
-    , verifyType
-    , accNo
-    , accName
-    , certNo
+    out_trade_no
+    , tran_time
+    , verify_type
+    , acct_no
+    , name
+    , cert_no
     , phone
   ].
 
 options() ->
   #{
     channel_type => xm_up,
-    txn_type=>xm_bankcard,
+    txn_type=>xm_up_bankcard,
     direction => req
   }.
 
@@ -83,17 +83,16 @@ convert_config() ->
         {to, pg_xm_up_protocol_req_bankcard},
         {from,
           [
-            {pg_mcht_protocol, pg_mcht_protocol_req_bankcard,
+            {pg_mcht_protocol, pg_mcht_protocol_req_xm_up_bankcard,
               [
-                {accNo, bank_card_no}
-                , {merId, {fun mer_id/1, [mcht_id]}}
-                , {certNo, id_no}
-                , {accName, id_name}
+                {customer_code, {fun mer_id/1, [mcht_id]}}
+                , {cert_no, id_no}
+                , {name, id_name}
                 , {phone, mobile}
-                , {accNo, bank_card_no}
-                , {txnTime, {fun now_txn/0, []}}
-                , {orderId, {fun xfutils:get_new_order_id/0, []}}
-                , {verifyType, {fun get_verify_type/1, [mobile]}}
+                , {acct_no, bank_card_no}
+                , {tran_time, {fun now_txn/0, []}}
+                , {out_trade_no, {fun xfutils:get_new_order_id/0, []}}
+                , {verify_type, {fun get_verify_type/1, [mobile]}}
                 , {mcht_index_key, mcht_index_key}
               ]
             }
@@ -111,13 +110,13 @@ convert_config() ->
                 {txn_type, {static, xm_bankcatd}}
                 , {txn_status, {static, waiting}}
                 , {mcht_index_key, pg_model, mcht_index_key}
-                , {up_merId, merId}
-                , {up_txnTime, txnTime}
-                , {up_orderId, orderId}
+                , {up_merId, customer_code}
+                , {up_txnTime, tran_time}
+                , {up_orderId, out_trade_no}
                 , {up_index_key, pg_up_protocol, up_index_key}
-                , {up_accNo, accNo}
-                , {up_idNo, certNo}
-                , {up_idName, accName}
+                , {up_accNo, acct_no}
+                , {up_idNo, cert_no}
+                , {up_idName, name}
                 , {up_mobile, phone}
               ]
             }
@@ -130,7 +129,6 @@ convert_config() ->
 repo_up_module() ->
   pg_up_protocol:repo_module(up_txn_log).
 
--define(APP, pg_up_protocol).
 xm_up_mer_id(MchtId) ->
   MRepoMchants = pg_up_protocol:repo_module(mchants),
 %%  {ok, MRepoMchants} = application:get_env(?APP, mchants_repo_name),
@@ -154,7 +152,8 @@ public_key(MchtId) ->
   PublicKey.
 
 now_txn() ->
-  datetime_x_fin:now(txn).
+  <<"2017-05-03 16:21:30">>.
+%%  datetime_x_fin:now(txn).
 %%--------------------------------------------------------------------------
 get_verify_type(Mobile) ->
   case Mobile of

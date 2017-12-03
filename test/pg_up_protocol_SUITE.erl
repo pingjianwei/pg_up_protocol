@@ -107,6 +107,13 @@ table_data_init() ->
         , {mcht_full_name, <<"test2">>}
         , {payment_method, [gw_collect]}
         , {up_term_no, <<"12345670">>}
+      ],
+
+      [
+        {id, 3}
+        , {mcht_full_name, <<"test3">>}
+        , {payment_method, [gw_xm_up_bankcard]}
+        , {up_term_no, <<"12345670">>}
       ]
     ],
 
@@ -124,26 +131,27 @@ my_test_() ->
       inorder,
       [
         {timeout, 120, fun repo_data_test_1/0}
-        , {timeout, 120, fun pg_up_protocol:sign_aaa_test_1/0}
-        , {timeout, 120, fun sign_test_1/0}
-        , {timeout, 120, fun get_test_1/0}
-        , {timeout, 120, fun save_test_1/0}
-%%      ,  fun verify_test_1/0
-        , {timeout, 120, fun public_key_test_1/0}
-        , {timeout, 120, fun pg_up_protocol_req_collect:mer_id_test_1/0}
-        , {timeout, 120, fun pg_up_protocol_req_collect:cert_id_test_1/0}
-        , {timeout, 120, fun pg_up_protocol_req_collect:customer_info_test_1/0}
-%%        , fun mcht_req_test_1/0
-        , {timeout, 120, fun save_req_convert_test_1/0}
-
-        , {timeout, 120, fun send_up_collect_test_1/0}
-        , {timeout, 120, fun send_up_collect_256_test_1/0}
-
-        , {timeout, 120, fun send_up_batch_collect_test_1/0}
-
-        , {timeout, 120, fun info_collect_test_1/0}
-
-        , {timeout, 120, fun xm_sign_test_1/0}
+%%        , {timeout, 120, fun pg_up_protocol:sign_aaa_test_1/0}
+%%        , {timeout, 120, fun sign_test_1/0}
+%%        , {timeout, 120, fun get_test_1/0}
+%%        , {timeout, 120, fun save_test_1/0}
+%%%%      ,  fun verify_test_1/0
+%%        , {timeout, 120, fun public_key_test_1/0}
+%%        , {timeout, 120, fun pg_up_protocol_req_collect:mer_id_test_1/0}
+%%        , {timeout, 120, fun pg_up_protocol_req_collect:cert_id_test_1/0}
+%%        , {timeout, 120, fun pg_up_protocol_req_collect:customer_info_test_1/0}
+%%%%        , fun mcht_req_test_1/0
+%%        , {timeout, 120, fun save_req_convert_test_1/0}
+%%
+%%        , {timeout, 120, fun send_up_collect_test_1/0}
+%%        , {timeout, 120, fun send_up_collect_256_test_1/0}
+%%
+%%        , {timeout, 120, fun send_up_batch_collect_test_1/0}
+%%
+%%        , {timeout, 120, fun info_collect_test_1/0}
+%%
+%%        , {timeout, 120, fun xm_sign_test_1/0}
+        , {timeout, 120, fun send_xm_up_bankcard_test_1/0}
 
       ]
     }
@@ -238,6 +246,19 @@ qs(batch_collect) ->
     , {<<"fileContent">>, file_content()}
     , {<<"batchNo">>, <<"0009">>}
     , {<<"reqReserved">>, <<"qqq">>}
+  ];
+
+qs(xm_up_bankcard) ->
+  [
+    {<<"merchId">>, <<"000003">>}
+    , {<<"tranDate">>, <<"20171202">>}
+    , {<<"tranId">>, <<"1512201789372">>}
+    , {<<"tranTime">>, <<"160309">>}
+    , {<<"bankCardNo">>, <<"6225220113392773">>}
+    , {<<"certifName">>, <<"赵金玲"/utf8>>}
+    , {<<"certifId">>, <<"220625198910180328">>}
+    , {<<"phoneNo">>, <<"13721422283">>}
+    , {<<"signature">>, <<"oGoeRE/5k+6+UOcw02Th36zmU7yNBhDrpL6hOhbahe7hQVzpnuZW+zSVf1sbQAHCANUL2DfUVsXkSjRKuj7pAkMmuVam/hHlG4MbhmgU5iShLvtQgaMDOetXpbIeJJN4xnXoFjhCmaSG7sM5O+XugCfVGh0SA5uIHjAAs2DS1Eg=">>}
   ].
 
 pk() ->
@@ -256,7 +277,9 @@ protocol(req) ->
 protocol(mcht_req) ->
   pg_protocol:out_2_in(?M_P_MCHT_REQ, qs(mcht_req));
 protocol(mcht_req_batch_collect) ->
-  pg_protocol:out_2_in(pg_mcht_protocol_req_batch_collect, qs(batch_collect)).
+  pg_protocol:out_2_in(pg_mcht_protocol_req_batch_collect, qs(batch_collect));
+protocol(mcht_req_xm_up_bankcard) ->
+  pg_protocol:out_2_in(pg_mcht_protocol_req_xm_up_bankcard, qs(xm_up_bankcard)).
 
 %%--------------------------------------------------------------------
 file_content() ->
@@ -514,7 +537,7 @@ send_up_batch_collect_test_1() ->
     [], [{body_format, binary}]),
   ?debugFmt("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
 
-  %% parse resp
+%%  %% parse resp
 %%  MResp = pg_up_protocol_resp_collect,
 %%  RespPV = xfutils:parse_post_body(Body),
 %%  ProtocolUpResp = pg_protocol:out_2_in(MResp, RespPV),
@@ -525,6 +548,44 @@ send_up_batch_collect_test_1() ->
   timer:sleep(1000),
 
   ok.
+%%-----------------------------------------------------------------------------------
+send_xm_up_bankcard_test_1() ->
+  PMchtReq = protocol(mcht_req_xm_up_bankcard),
+  ?debugFmt("PMchtReq = ~p", [PMchtReq]),
+  PUpReq = pg_convert:convert(pg_xm_up_protocol_req_bankcard, PMchtReq),
+  {_, Sig} = pg_xm_up_protocol:sign(pg_xm_up_protocol_req_bankcard, PUpReq),
+  PXmUpReqWithSig = pg_model:set(pg_xm_up_protocol_req_bankcard, PUpReq, signature, Sig),
+  ?debugFmt("PXmUpReqWithSig = ~p", [PXmUpReqWithSig]),
+
+%%  PostBody = pg_up_protocol:post_string(pg_up_protocol_req_collect, PUpReqWithSig),
+  JosnStr = pg_xm_up_protocol:in_2_out(pg_xm_up_protocol_req_bankcard, PXmUpReqWithSig, json),
+  ?debugFmt("JosnStr = ~ts", [JosnStr]),
+  PostBody = pg_xm_up_protocol:des3_ecb_encrypt(xm_up_config:get_config(xm_des_key),JosnStr),
+  Url =  <<(xm_up_config:get_config(xm_up_bankcard_url))/binary,
+    (pg_model:get(pg_xm_up_protocol_req_bankcard,PXmUpReqWithSig,customer_code))/binary>>,
+
+  ?debugFmt("PostString = ~ts,Url = ~p", [PostBody, Url]),
+
+  {ok, {Status, Headers, Body}} = httpc:request(post,
+    {binary_to_list(Url), [], "application/x-www-form-urlencoded", iolist_to_binary(PostBody)},
+    [], [{body_format, binary}]),
+  ?debugFmt("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
+
+  %% parse resp
+  MResp = pg_xm_up_protocol_resp_bankcard,
+  XmBankcarModel =pg_xm_up_protocol:out_2_in(MResp,jsx:decode(Body)) ,
+  ?debugFmt("XmBankcarModel =~p", [XmBankcarModel]),
+  ?assertEqual(ok, pg_xm_up_protocol:verify(MResp,XmBankcarModel)),
+%%  ProtocolUpResp = pg_protocol:out_2_in(MResp, RespPV),
+%%  ?debugFmt("ProtocolUpResp = ~ts", [pg_model:pr(MResp, ProtocolUpResp)]),
+%%  ?assertEqual(<<"UTF-8">>, pg_model:get(MResp, ProtocolUpResp, encoding)),
+%%  ?assertNotEqual(nomatch, binary:match(Body, <<"respCode=00">>)),
+
+  timer:sleep(1000),
+
+  ok.
+
+
 %%---------------------------------------------------
 info_collect_test_1() ->
   M = pg_up_protocol_info_collect,
@@ -559,14 +620,14 @@ info_collect_test_1() ->
 
   ok.
 %%------------------------------------------------------------------------
-xm_sign_test_1()->
+xm_sign_test_1() ->
   M = pg_xm_up_protocol,
-  BankcardRepo={pg_xm_up_protocol_req_bankcard, unfined, <<"B8999001">>,<<"201712011212">>, <<"2017-12-01 10:36:12">>,
-    <<"0030">>,<<"6225220113392773">>, <<>>, <<"220625198910180328">>, <<"赵金玲"/utf8>>,<<>>},
-  {SignString, Sig}=M:sign(pg_xm_up_protocol_req_bankcard,BankcardRepo),
+  BankcardRepo = {pg_xm_up_protocol_req_bankcard, unfined, <<"B8999001">>, <<"201712011212">>, <<"2017-12-01 10:36:12">>,
+    <<"0030">>, <<"6225220113392773">>, <<>>, <<"220625198910180328">>, <<"赵金玲"/utf8>>, <<>>},
+  {SignString, Sig} = M:sign(pg_xm_up_protocol_req_bankcard, BankcardRepo),
   ?assertEqual(<<"ORDERID=201712011212&TXNTIME=2017-12-01 10:36:12&VERIFYTYPE=0030&ACCNO=6225220113392773&ACCNAME=赵金玲&CERTNO=220625198910180328"/utf8>>,
     SignString),
 
-  lager:debug("Sig:~p",[Sig]),
+  lager:debug("Sig:~p", [Sig]),
   ?assertEqual(<<"aBhSmBdjZ5POBHmWyPKF8Hi1h2ljqeiQ0YbocXBYQ52Bu4ZvKrROU6xVu6R8ez9EIuPgeS8VOlT3otnnYRAmR2YJa5H048cuPhg+dlI7hJNXYAuYJG7VZW/3+4QQhEt01cx6AjcLUb0ChEVYuXh0Aye0lkG/8HNYlmbeK2H81FM=">>
-    ,Sig).
+    , Sig).
